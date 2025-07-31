@@ -1,9 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/receipt.py", "use": "@vercel/python" }
+    {
+      "src": "api/receipt.py",
+      "use": "@vercel/python"
+    }
   ],
   "routes": [
-    { "src": "/api/receipt", "dest": "api/receipt.py" }
+    {
+      "src": "/api/receipt",
+      "dest": "api/receipt.py"
+    }
   ]
 }
