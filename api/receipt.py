@@ -1,67 +1,38 @@
-from fpdf import FPDF
-import qrcode
-import io
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 import base64
-from datetime import datetime
-import random
-
-def generate_receipt(products):
-    shop_name = random.choice([
-        "Urban Mart", "Smart Bazaar", "Quick Store", "Modern Market",
-        "Future Shop", "Daily Mart"
-    ])
-    invoice_id = f"INV-{random.randint(100000, 999999)}"
-    date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    subtotal = sum(p.get("price", 0) for p in products)
-    tax_rate = 5
-    tax = (subtotal * tax_rate) / 100
-    total = subtotal + tax
-
-    qr = qrcode.make(invoice_id)
-    qr_io = io.BytesIO(); qr.save(qr_io, format="PNG"); qr_io.seek(0)
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(200, 10, shop_name, ln=1, align="C")
-    pdf.set_font("Arial", size=10)
-    pdf.cell(200, 8, f"Invoice ID: {invoice_id}", ln=1, align="C")
-    pdf.cell(200, 8, f"Date: {date}", ln=1, align="C")
-    pdf.ln(10)
-
-    pdf.set_font("Arial", size=11)
-    for idx, p in enumerate(products, 1):
-        name = p.get("name", "")
-        price = p.get("price", 0)
-        pdf.cell(0, 8, f"{idx}. {name} — ৳{price:.2f}", ln=1)
-
-    pdf.ln(5)
-    pdf.cell(0, 8, f"Subtotal: ৳{subtotal:.2f}", ln=1)
-    pdf.cell(0, 8, f"Tax ({tax_rate}%): +৳{tax:.2f}", ln=1)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, f"Total: ৳{total:.2f}", ln=1)
-    pdf.image(qr_io, x=80, y=pdf.get_y()+10, w=50)
-
-    out = io.BytesIO(); pdf.output(out); out.seek(0)
-    return out.read()
+from io import BytesIO
 
 def handler(request):
     try:
-        body = request.get_json() or {}
-        products = body.get("products") or []
-        if not products:
-            return {"statusCode": 400, "body": "No products provided"}
+        # Dummy Data for test
+        products = [{"name": "Pen", "price": 10}, {"name": "Book", "price": 100}]
+        total = sum(p["price"] for p in products)
 
-        pdf_bytes = generate_receipt(products)
-        encoded = base64.b64encode(pdf_bytes).decode()
+        buffer = BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+
+        pdf.drawString(100, 800, "🧾 Receipt")
+        y = 760
+        for p in products:
+            pdf.drawString(100, y, f"{p['name']} - ৳{p['price']}")
+            y -= 20
+
+        pdf.drawString(100, y - 10, f"Total: ৳{total}")
+        pdf.showPage()
+        pdf.save()
+
+        buffer.seek(0)
+        encoded_pdf = base64.b64encode(buffer.read()).decode("utf-8")
+
         return {
             "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/pdf",
-                "Content-Disposition": "inline; filename=receipt.pdf"
-            },
-            "isBase64Encoded": True,
-            "body": encoded
+            "headers": {"Content-Type": "application/json"},
+            "body": f'{{"pdf": "{encoded_pdf}"}}'
         }
+
     except Exception as e:
-        return {"statusCode": 500, "body": str(e)}
+        return {
+            "statusCode": 500,
+            "body": f"Error: {str(e)}"
+        }
